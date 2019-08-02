@@ -1,0 +1,272 @@
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" ><generator uri="https://jekyllrb.com/" version="3.8.6">Jekyll</generator><link href="http://localhost:4000/feed.xml" rel="self" type="application/atom+xml" /><link href="http://localhost:4000/" rel="alternate" type="text/html" /><updated>2019-08-02T18:27:05+02:00</updated><id>http://localhost:4000/feed.xml</id><title type="html">Playing with the cloud</title><subtitle>A blog to store those things that I learn about cloud development and maybe can be useful for somebody.</subtitle><entry><title type="html">Move your Rook!</title><link href="http://localhost:4000/rook/k8/ceph/2019/08/02/move_your_rook.html" rel="alternate" type="text/html" title="Move your Rook!" /><published>2019-08-02T16:53:13+02:00</published><updated>2019-08-02T16:53:13+02:00</updated><id>http://localhost:4000/rook/k8/ceph/2019/08/02/move_your_rook</id><content type="html" xml:base="http://localhost:4000/rook/k8/ceph/2019/08/02/move_your_rook.html">&lt;p&gt;&lt;img src=&quot;/assets/images/darlene-cerna-iRL1P94z4Xc-unsplash.jpg&quot; alt=&quot;move_the_rook&quot; /&gt;
+Photo by Darlene Cerna on Unsplash&lt;/p&gt;
+
+&lt;p&gt;This is basically a step by step guide to show the process needed to have a kubernetes lab with several nodes working, the Rook operator installed and a Ceph test cluster created by Rook
+Using this lab up i will explain how to do a very first modification in the Rook operator.&lt;/p&gt;
+
+&lt;h3 id=&quot;1-create-the-k8-cluster&quot;&gt;1. Create the k8 cluster&lt;/h3&gt;
+
+&lt;p&gt;We need a flexible and quick way to create a k8’s cluster for our lab. This means that we must create/delete/stop and modify the composition of the k8’s cluster in a breeze.
+@galexrt has done the hard work for us, and provide the right tool to setup our lab very quickly.
+Basically it uses Vagrant to configure a set of vm machines where to install the  kubernetes master with the preferred number of nodes. We can do all the work using &lt;em&gt;make commands&lt;/em&gt; with different &lt;em&gt;targets&lt;/em&gt;&lt;/p&gt;
+
+&lt;p&gt;So the first thing to do is to clone &lt;a href=&quot;https://github.com/galexrt/k8s-vagrant-multi-node&quot;&gt;k8s-vagrant-multi-node&lt;/a&gt; and to have a coffee while reading to understand how it works.&lt;/p&gt;
+
+&lt;p&gt;If you do not want to have a coffee, you can use these commands to have your k8’s cluster (1 master and 3 nodes) up and running in just 5 minutes.&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;$ git clone git@github.com:galexrt/k8s-vagrant-multi-node.git
+$ cd k8s-vagrant-multi-node
+$ NODE_COUNT=3 make up -j4
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;NOTE:
+The tool allows you to change several env vars, apart of making them &lt;em&gt;permanent&lt;/em&gt; modifying the &lt;em&gt;Makefile&lt;/em&gt;
+Ex. In my case, I wanted to use always CentOS images for the k8’s nodes, so I introduce the following modification in the &lt;em&gt;Makefile&lt;/em&gt; file:&lt;/p&gt;
+
+&lt;p&gt;BOX_OS ?= centos&lt;/p&gt;
+
+&lt;p&gt;Check the creation of the different vm’s and the k8’s cluster health:&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;$ VBoxManage list runningvms
+&quot;k8s-vagrant-multi-node_node3_1564563685177_19234&quot; {fcc23840-91df-43b8-ba72-2daf5ee296d8}
+&quot;k8s-vagrant-multi-node_master_1564563683178_24986&quot; {6c86c268-0339-4331-a91f-117865815d27}
+&quot;k8s-vagrant-multi-node_node1_1564563683203_78317&quot; {eaf1b72f-02e5-437b-af33-3cf8703f4708}
+&quot;k8s-vagrant-multi-node_node2_1564563683263_17543&quot; {57231ef2-f216-4961-b9e5-3479385388e1}
+
+
+$ kubectl get nodes
+NAME      STATUS    ROLES     AGE       VERSION
+master    Ready     master    14m       v1.15.1
+node1     Ready     &amp;lt;none&amp;gt;    13m       v1.15.1
+node2     Ready     &amp;lt;none&amp;gt;    13m       v1.15.1
+node3     Ready     &amp;lt;none&amp;gt;    13m       v1.15.1
+
+$ kubectl cluster-info
+Kubernetes master is running at https://192.168.26.10:6443
+KubeDNS is running at https://192.168.26.10:6443/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
+
+To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
+
+$ kubectl get cs
+NAME                 STATUS    MESSAGE             ERROR
+scheduler            Healthy   ok
+controller-manager   Healthy   ok
+etcd-0               Healthy   {&quot;health&quot;:&quot;true&quot;}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;h3 id=&quot;2-install-rook-and-create-a-ceph-cluster&quot;&gt;2. Install Rook and create a Ceph cluster:&lt;/h3&gt;
+
+&lt;p&gt;Rook is great!!… never was so easy to install a Ceph cluster…. k8’s and operators provide the magic, Rook is the wizard!.&lt;/p&gt;
+
+&lt;p&gt;Once again, maybe you will enjoy a tea while reading the &lt;a href=&quot;https://rook.github.io/docs/rook/master/ceph-quickstart.html&quot;&gt;quickstart guide&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;If you do not like tea, you can use directly my commands:&lt;/p&gt;
+
+&lt;p&gt;First thing to do is to clone the repo in your Go src folder:&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;$ cd /home/jolmomar/go/src/github.com/
+$ mkdir rook
+$ cd rook
+$ git clone git@github.com:rook/rook.git
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Once we have the source code let’s go to create the Ceph custom resources and the operator, using the &lt;em&gt;*.yaml&lt;/em&gt; files that you can find in the examples folder.&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;$ $ pwd
+/home/jolmomar/go/src/github.com/rook/rook/cluster/examples/kubernetes/ceph
+
+$ kubectl create -f common.yaml
+$ kubectl create -f operator.yaml
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Wait until operator and discovery pods(1 for node) will be running:&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;$ watch kubectl -n rook-ceph get pod
+NAME                                  READY     STATUS    RESTARTS   AGE
+rook-ceph-operator-56b7cdb77b-r7qlm   1/1       Running   0          5m27s
+rook-discover-kftdr                   1/1       Running   0          3m33s
+rook-discover-ndd7c                   1/1       Running   0          3m33s
+rook-discover-xklgc                   1/1       Running   0          3m33s
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Now, create the ceph cluster:&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;$ kubectl create -f cluster-test.yaml
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Wait until all the pods will be running. In a few minutes you will have a basic functional Ceph cluster in K8’s. This will be our lab!&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;$ kubectl -n rook-ceph get pod
+NAME                                  READY     STATUS      RESTARTS   AGE
+rook-ceph-agent-jv5z2                 1/1       Running     0          3m24s
+rook-ceph-agent-qhj2x                 1/1       Running     0          3m24s
+rook-ceph-agent-twm2b                 1/1       Running     0          3m24s
+rook-ceph-mgr-a-7d9768cf76-swdsj      1/1       Running     0          2m36s
+rook-ceph-mon-a-58bd7665fd-kz5f9      1/1       Running     0          2m54s
+rook-ceph-operator-56b7cdb77b-r7qlm   1/1       Running     0          9m33s
+rook-ceph-osd-0-685f69d9df-ktmpj      1/1       Running     0          2m
+rook-ceph-osd-1-c98865cdf-f7lj9       1/1       Running     0          116s
+rook-ceph-osd-2-b7c94b6bc-5fsxr       1/1       Running     0          114s
+rook-ceph-osd-prepare-node1-hgvpx     0/2       Completed   0          2m7s
+rook-ceph-osd-prepare-node2-ghxxm     0/2       Completed   0          2m7s
+rook-ceph-osd-prepare-node3-ggjkf     0/2       Completed   1          2m7s
+rook-discover-kftdr                   1/1       Running     0          7m39s
+rook-discover-ndd7c                   1/1       Running     0          7m39s
+rook-discover-xklgc                   1/1       Running     0          7m39s
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;h3 id=&quot;3-cleaning-up-things&quot;&gt;3. Cleaning up things&lt;/h3&gt;
+
+&lt;p&gt;Programming can be a dangerous activity sometimes. In the case that you make something crazy … probably, you will like to clean up things and start again form scratch…. this is my “restart the world” recipe&lt;/p&gt;
+
+&lt;p&gt;For the Ceph Cluster managed by Rook you can follow this &lt;a href=&quot;https://rook.github.io/docs/rook/master/ceph-teardown.html&quot;&gt;instructions&lt;/a&gt;, that I summarized here:&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;$ kubectl -n rook-ceph delete cephcluster rook-ceph
+
+$ kubectl delete -f operator.yaml
+
+$ kubectl delete -f common.yaml
+
+$ kubectl -n rook-ceph get pod
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;And of course, you can even destroy the vm’s with your k8 cluster if things went really, really wrong (in this case, please write a post explaining how did you get this awesome achievement!!)&lt;/p&gt;
+
+&lt;p&gt;Move to your &lt;em&gt;k8s-vagrant-multi-node&lt;/em&gt;  folder and execute this command to clean the k8’s master and the three nodes.&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;$ NODE_COUNT=3 make clean
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;h3 id=&quot;move-the-rook-my-first-modification&quot;&gt;Move the Rook!! My first modification&lt;/h3&gt;
+
+&lt;p&gt;The exciting moment arrived!. Let’s modify the Rook operator and check our modification.&lt;/p&gt;
+
+&lt;p&gt;The Rook operator log will tell us about our modification, so let’s check it, before any modification, just to take a look at it:&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;$ kubectl -n rook-ceph get pod
+NAME                                  READY     STATUS              RESTARTS   AGE
+rook-ceph-operator-6566dd4985-drrsw   1/1       Running             0          18s
+rook-discover-5lnkz                   1/1       Running             0          6s
+rook-discover-8mgvr                   0/1       ContainerCreating   0          6s
+rook-discover-9j2v2                   0/1       ContainerCreating   0          6s
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;If we check the operator pod log we see that we have the following lines:&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;$ kubectl -n rook-ceph logs rook-ceph-operator-6566dd4985-drrsw
+
+
+2019-07-31 11:41:54.722382 I | rookcmd: starting Rook v0.8.0-1294.g1b6fe840.dirty with arguments '/usr/local/bin/rook ceph operator'
+
+2019-07-31 11:41:54.722508 I | rookcmd: flag values: ....
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Lets try to insert a new log line when the operator starts:&lt;/p&gt;
+
+&lt;p&gt;We are going to do a very simple modification, just to add a new line in the Rook operator file when it starts. Modification will be done in the “rook/cmd/rook/rook/rook.go” file&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;// LogStartupInfo log the version number, arguments, and all final flag values (environment variable overrides have already been taken into account)
+func LogStartupInfo(cmdFlags *pflag.FlagSet) {
+
+	flagValues := flags.GetFlagsAndValues(cmdFlags, &quot;secret|keyring&quot;)
+	logger.Infof(&quot;starting Rook %s with arguments '%s'&quot;, version.Version, strings.Join(os.Args, &quot; &quot;))
+	logger.Infof(&quot;flag values: %s&quot;, strings.Join(flagValues, &quot;, &quot;))
+	logger.Infof(&quot;Hey!!!! -------------------- This is my very first line in Rook&quot;)
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Lets build the new operator container. This can be done in the root folder of the project:&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;$ pwd
+/home/jolmomar/go/src/github.com/rook/rook
+
+$ make -j4 IMAGES='ceph' build
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Check that we have our new container:&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;$ docker images
+REPOSITORY                  TAG                 IMAGE ID            CREATED             SIZE
+build-4bc9ed8c/ceph-amd64   latest              ccd3c6105d1d        37 seconds ago      921MB
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;We must use this new image to start the operator pod. This means that k8 nodes should be able to pull the image from a registry.
+The easy option is to pull your modified image to one of your docker hub repos, and use it. So first thing to do is to create/use your docker hub account, and create a “rook” repo in docker hub.
+Once we have the “infrastructure” we can push our new image and start to use it in our k8 nodes.&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;$ docker tag build-4bc9ed8c/ceph-amd64 jolmomar/rook:latest
+
+$ docker push jolmomar/rook
+The push refers to repository [docker.io/jolmomar/rook]
+32011c0556a2: Pushed
+8d8bce899a8e: Pushed
+2f5e42981c8f: Pushed
+c1e065038222: Layer already exists
+d2774fc103ac: Layer already exists
+d69483a6face: Layer already exists
+latest: digest: sha256:b6053a2a5446944d9a0a3be50ec5b10f225ae2607ad013666bf08926ed77c563 size: 1579
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;To use this new image we must modify the operator.yaml file we use to manage the rook operator.&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;$ pwd
+/home/jolmomar/go/src/github.com/rook/rook/cluster/examples/kubernetes/ceph
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Modify the file &lt;em&gt;operator.yaml&lt;/em&gt;, to include the &lt;em&gt;path&lt;/em&gt; to your Rook operator image:&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;...
+spec:
+  serviceAccountName: rook-ceph-system
+  containers:
+  - name: rook-ceph-operator
+    image: jolmomar/rook
+...
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Once modified the “operator.yaml” file, lets go to try it. First thing to do is to delete the previous operator pod:&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;$ kubectl -n rook-ceph get pod
+NAME                                  READY     STATUS    RESTARTS   AGE
+rook-ceph-operator-6566dd4985-drrsw   1/1       Running   0          154m
+
+$ kubectl delete -f operator.yaml
+deployment.apps &quot;rook-ceph-operator&quot; deleted
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Now let’s go to create again the operator pod, this time the image for it is the modified one, and it is available in our “rook” docker hub repo.&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;$ kubectl create -f operator.yaml
+deployment.apps/rook-ceph-operator created
+
+$ kubectl -n rook-ceph get pod
+NAME                                  READY     STATUS    RESTARTS   AGE
+rook-ceph-operator-6566dd4985-z4s9r   1/1       Running   0          21s
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;And the last step is just to check that our log line appears in the log file&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;$ kubectl -n rook-ceph logs rook-ceph-operator-6566dd4985-z4s9r
+2019-07-31 14:18:52.874209 I | rookcmd: starting Rook v0.8.0-1294.g1b6fe840.dirty with arguments '/usr/local/bin/rook ceph operator'
+2019-07-31 14:18:52.874385 I | rookcmd: flag values: ...
+...
+2019-07-31 14:18:52.874395 I | rookcmd: Hey!!!! -------------------- This is my very first line in Rook
+2019-07-31 14:18:52.874401 I | cephcmd: starting operator
+2019-07-31 14:18:52.907075 I | op-discover: rook-discover daemonset already exists, updating ...
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;And this is all… now you have the power to modify and improve the Rook operator.&lt;/p&gt;
+
+&lt;p&gt;Is time to contribute your awesome ideas to the Rook project, the difficult part, to have the idea is done, so the only thing you need to do is to follow &lt;a href=&quot;https://github.com/rook/rook/blob/master/CONTRIBUTING.md&quot;&gt;the guide to contribute&lt;/a&gt;&lt;/p&gt;</content><author><name></name></author><summary type="html">Photo by Darlene Cerna on Unsplash</summary></entry><entry><title type="html">Welcome to Jekyll!</title><link href="http://localhost:4000/jekyll/update/2019/08/02/welcome-to-jekyll.html" rel="alternate" type="text/html" title="Welcome to Jekyll!" /><published>2019-08-02T16:53:13+02:00</published><updated>2019-08-02T16:53:13+02:00</updated><id>http://localhost:4000/jekyll/update/2019/08/02/welcome-to-jekyll</id><content type="html" xml:base="http://localhost:4000/jekyll/update/2019/08/02/welcome-to-jekyll.html">&lt;p&gt;You’ll find this post in your &lt;code class=&quot;highlighter-rouge&quot;&gt;_posts&lt;/code&gt; directory. Go ahead and edit it and re-build the site to see your changes. You can rebuild the site in many different ways, but the most common way is to run &lt;code class=&quot;highlighter-rouge&quot;&gt;jekyll serve&lt;/code&gt;, which launches a web server and auto-regenerates your site when a file is updated.&lt;/p&gt;
+
+&lt;p&gt;To add new posts, simply add a file in the &lt;code class=&quot;highlighter-rouge&quot;&gt;_posts&lt;/code&gt; directory that follows the convention &lt;code class=&quot;highlighter-rouge&quot;&gt;YYYY-MM-DD-name-of-post.ext&lt;/code&gt; and includes the necessary front matter. Take a look at the source for this post to get an idea about how it works.&lt;/p&gt;
+
+&lt;p&gt;Jekyll also offers powerful support for code snippets:&lt;/p&gt;
+
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-ruby&quot; data-lang=&quot;ruby&quot;&gt;&lt;span class=&quot;k&quot;&gt;def&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;print_hi&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+  &lt;span class=&quot;nb&quot;&gt;puts&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&quot;Hi, &lt;/span&gt;&lt;span class=&quot;si&quot;&gt;#{&lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;si&quot;&gt;}&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;end&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;print_hi&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s1&quot;&gt;'Tom'&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;#=&amp;gt; prints 'Hi, Tom' to STDOUT.&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+
+&lt;p&gt;Check out the &lt;a href=&quot;https://jekyllrb.com/docs/home&quot;&gt;Jekyll docs&lt;/a&gt; for more info on how to get the most out of Jekyll. File all bugs/feature requests at &lt;a href=&quot;https://github.com/jekyll/jekyll&quot;&gt;Jekyll’s GitHub repo&lt;/a&gt;. If you have questions, you can ask them on &lt;a href=&quot;https://talk.jekyllrb.com/&quot;&gt;Jekyll Talk&lt;/a&gt;.&lt;/p&gt;</content><author><name></name></author><summary type="html">You’ll find this post in your _posts directory. Go ahead and edit it and re-build the site to see your changes. You can rebuild the site in many different ways, but the most common way is to run jekyll serve, which launches a web server and auto-regenerates your site when a file is updated.</summary></entry></feed>

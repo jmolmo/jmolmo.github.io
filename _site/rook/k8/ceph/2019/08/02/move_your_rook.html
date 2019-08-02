@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1"><!-- Begin Jekyll SEO tag v2.6.1 -->
+<title>Move your Rook! | Playing with the cloud</title>
+<meta name="generator" content="Jekyll v3.8.6" />
+<meta property="og:title" content="Move your Rook!" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="Photo by Darlene Cerna on Unsplash" />
+<meta property="og:description" content="Photo by Darlene Cerna on Unsplash" />
+<link rel="canonical" href="http://localhost:4000/rook/k8/ceph/2019/08/02/move_your_rook.html" />
+<meta property="og:url" content="http://localhost:4000/rook/k8/ceph/2019/08/02/move_your_rook.html" />
+<meta property="og:site_name" content="Playing with the cloud" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2019-08-02T16:53:13+02:00" />
+<script type="application/ld+json">
+{"mainEntityOfPage":{"@type":"WebPage","@id":"http://localhost:4000/rook/k8/ceph/2019/08/02/move_your_rook.html"},"@type":"BlogPosting","url":"http://localhost:4000/rook/k8/ceph/2019/08/02/move_your_rook.html","headline":"Move your Rook!","dateModified":"2019-08-02T16:53:13+02:00","datePublished":"2019-08-02T16:53:13+02:00","description":"Photo by Darlene Cerna on Unsplash","@context":"https://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+<link rel="stylesheet" href="/assets/main.css"><link type="application/atom+xml" rel="alternate" href="http://localhost:4000/feed.xml" title="Playing with the cloud" /></head>
+<body><header class="site-header" role="banner">
+
+  <div class="wrapper"><a class="site-title" rel="author" href="/">Playing with the cloud</a><nav class="site-nav">
+        <input type="checkbox" id="nav-trigger" class="nav-trigger" />
+        <label for="nav-trigger">
+          <span class="menu-icon">
+            <svg viewBox="0 0 18 15" width="18px" height="15px">
+              <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.032C17.335,0,18,0.665,18,1.484L18,1.484z M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.032C17.335,6.031,18,6.696,18,7.516L18,7.516z M18,13.516C18,14.335,17.335,15,16.516,15H1.484 C0.665,15,0,14.335,0,13.516l0,0c0-0.82,0.665-1.483,1.484-1.483h15.032C17.335,12.031,18,12.695,18,13.516L18,13.516z"/>
+            </svg>
+          </span>
+        </label>
+
+        <div class="trigger"><a class="page-link" href="/about/">About</a></div>
+      </nav></div>
+</header>
+<main class="page-content" aria-label="Content">
+      <div class="wrapper">
+        <article class="post h-entry" itemscope itemtype="http://schema.org/BlogPosting">
+
+  <header class="post-header">
+    <h1 class="post-title p-name" itemprop="name headline">Move your Rook!</h1>
+    <p class="post-meta">
+      <time class="dt-published" datetime="2019-08-02T16:53:13+02:00" itemprop="datePublished">Aug 2, 2019
+      </time></p>
+  </header>
+
+  <div class="post-content e-content" itemprop="articleBody">
+    <p><img src="/assets/images/darlene-cerna-iRL1P94z4Xc-unsplash.jpg" alt="move_the_rook" />
+Photo by Darlene Cerna on Unsplash</p>
+
+<p>This is basically a step by step guide to show the process needed to have a kubernetes lab with several nodes working, the Rook operator installed and a Ceph test cluster created by Rook
+Using this lab up i will explain how to do a very first modification in the Rook operator.</p>
+
+<h3 id="1-create-the-k8-cluster">1. Create the k8 cluster</h3>
+
+<p>We need a flexible and quick way to create a k8’s cluster for our lab. This means that we must create/delete/stop and modify the composition of the k8’s cluster in a breeze.
+@galexrt has done the hard work for us, and provide the right tool to setup our lab very quickly.
+Basically it uses Vagrant to configure a set of vm machines where to install the  kubernetes master with the preferred number of nodes. We can do all the work using <em>make commands</em> with different <em>targets</em></p>
+
+<p>So the first thing to do is to clone <a href="https://github.com/galexrt/k8s-vagrant-multi-node">k8s-vagrant-multi-node</a> and to have a coffee while reading to understand how it works.</p>
+
+<p>If you do not want to have a coffee, you can use these commands to have your k8’s cluster (1 master and 3 nodes) up and running in just 5 minutes.</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ git clone git@github.com:galexrt/k8s-vagrant-multi-node.git
+$ cd k8s-vagrant-multi-node
+$ NODE_COUNT=3 make up -j4
+</code></pre></div></div>
+
+<p>NOTE:
+The tool allows you to change several env vars, apart of making them <em>permanent</em> modifying the <em>Makefile</em>
+Ex. In my case, I wanted to use always CentOS images for the k8’s nodes, so I introduce the following modification in the <em>Makefile</em> file:</p>
+
+<p>BOX_OS ?= centos</p>
+
+<p>Check the creation of the different vm’s and the k8’s cluster health:</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ VBoxManage list runningvms
+"k8s-vagrant-multi-node_node3_1564563685177_19234" {fcc23840-91df-43b8-ba72-2daf5ee296d8}
+"k8s-vagrant-multi-node_master_1564563683178_24986" {6c86c268-0339-4331-a91f-117865815d27}
+"k8s-vagrant-multi-node_node1_1564563683203_78317" {eaf1b72f-02e5-437b-af33-3cf8703f4708}
+"k8s-vagrant-multi-node_node2_1564563683263_17543" {57231ef2-f216-4961-b9e5-3479385388e1}
+
+
+$ kubectl get nodes
+NAME      STATUS    ROLES     AGE       VERSION
+master    Ready     master    14m       v1.15.1
+node1     Ready     &lt;none&gt;    13m       v1.15.1
+node2     Ready     &lt;none&gt;    13m       v1.15.1
+node3     Ready     &lt;none&gt;    13m       v1.15.1
+
+$ kubectl cluster-info
+Kubernetes master is running at https://192.168.26.10:6443
+KubeDNS is running at https://192.168.26.10:6443/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
+
+To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
+
+$ kubectl get cs
+NAME                 STATUS    MESSAGE             ERROR
+scheduler            Healthy   ok
+controller-manager   Healthy   ok
+etcd-0               Healthy   {"health":"true"}
+</code></pre></div></div>
+
+<h3 id="2-install-rook-and-create-a-ceph-cluster">2. Install Rook and create a Ceph cluster:</h3>
+
+<p>Rook is great!!… never was so easy to install a Ceph cluster…. k8’s and operators provide the magic, Rook is the wizard!.</p>
+
+<p>Once again, maybe you will enjoy a tea while reading the <a href="https://rook.github.io/docs/rook/master/ceph-quickstart.html">quickstart guide</a>.</p>
+
+<p>If you do not like tea, you can use directly my commands:</p>
+
+<p>First thing to do is to clone the repo in your Go src folder:</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ cd /home/jolmomar/go/src/github.com/
+$ mkdir rook
+$ cd rook
+$ git clone git@github.com:rook/rook.git
+</code></pre></div></div>
+
+<p>Once we have the source code let’s go to create the Ceph custom resources and the operator, using the <em>*.yaml</em> files that you can find in the examples folder.</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ $ pwd
+/home/jolmomar/go/src/github.com/rook/rook/cluster/examples/kubernetes/ceph
+
+$ kubectl create -f common.yaml
+$ kubectl create -f operator.yaml
+</code></pre></div></div>
+
+<p>Wait until operator and discovery pods(1 for node) will be running:</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ watch kubectl -n rook-ceph get pod
+NAME                                  READY     STATUS    RESTARTS   AGE
+rook-ceph-operator-56b7cdb77b-r7qlm   1/1       Running   0          5m27s
+rook-discover-kftdr                   1/1       Running   0          3m33s
+rook-discover-ndd7c                   1/1       Running   0          3m33s
+rook-discover-xklgc                   1/1       Running   0          3m33s
+</code></pre></div></div>
+
+<p>Now, create the ceph cluster:</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ kubectl create -f cluster-test.yaml
+</code></pre></div></div>
+
+<p>Wait until all the pods will be running. In a few minutes you will have a basic functional Ceph cluster in K8’s. This will be our lab!</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ kubectl -n rook-ceph get pod
+NAME                                  READY     STATUS      RESTARTS   AGE
+rook-ceph-agent-jv5z2                 1/1       Running     0          3m24s
+rook-ceph-agent-qhj2x                 1/1       Running     0          3m24s
+rook-ceph-agent-twm2b                 1/1       Running     0          3m24s
+rook-ceph-mgr-a-7d9768cf76-swdsj      1/1       Running     0          2m36s
+rook-ceph-mon-a-58bd7665fd-kz5f9      1/1       Running     0          2m54s
+rook-ceph-operator-56b7cdb77b-r7qlm   1/1       Running     0          9m33s
+rook-ceph-osd-0-685f69d9df-ktmpj      1/1       Running     0          2m
+rook-ceph-osd-1-c98865cdf-f7lj9       1/1       Running     0          116s
+rook-ceph-osd-2-b7c94b6bc-5fsxr       1/1       Running     0          114s
+rook-ceph-osd-prepare-node1-hgvpx     0/2       Completed   0          2m7s
+rook-ceph-osd-prepare-node2-ghxxm     0/2       Completed   0          2m7s
+rook-ceph-osd-prepare-node3-ggjkf     0/2       Completed   1          2m7s
+rook-discover-kftdr                   1/1       Running     0          7m39s
+rook-discover-ndd7c                   1/1       Running     0          7m39s
+rook-discover-xklgc                   1/1       Running     0          7m39s
+</code></pre></div></div>
+
+<h3 id="3-cleaning-up-things">3. Cleaning up things</h3>
+
+<p>Programming can be a dangerous activity sometimes. In the case that you make something crazy … probably, you will like to clean up things and start again form scratch…. this is my “restart the world” recipe</p>
+
+<p>For the Ceph Cluster managed by Rook you can follow this <a href="https://rook.github.io/docs/rook/master/ceph-teardown.html">instructions</a>, that I summarized here:</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ kubectl -n rook-ceph delete cephcluster rook-ceph
+
+$ kubectl delete -f operator.yaml
+
+$ kubectl delete -f common.yaml
+
+$ kubectl -n rook-ceph get pod
+</code></pre></div></div>
+
+<p>And of course, you can even destroy the vm’s with your k8 cluster if things went really, really wrong (in this case, please write a post explaining how did you get this awesome achievement!!)</p>
+
+<p>Move to your <em>k8s-vagrant-multi-node</em>  folder and execute this command to clean the k8’s master and the three nodes.</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ NODE_COUNT=3 make clean
+</code></pre></div></div>
+
+<h3 id="move-the-rook-my-first-modification">Move the Rook!! My first modification</h3>
+
+<p>The exciting moment arrived!. Let’s modify the Rook operator and check our modification.</p>
+
+<p>The Rook operator log will tell us about our modification, so let’s check it, before any modification, just to take a look at it:</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ kubectl -n rook-ceph get pod
+NAME                                  READY     STATUS              RESTARTS   AGE
+rook-ceph-operator-6566dd4985-drrsw   1/1       Running             0          18s
+rook-discover-5lnkz                   1/1       Running             0          6s
+rook-discover-8mgvr                   0/1       ContainerCreating   0          6s
+rook-discover-9j2v2                   0/1       ContainerCreating   0          6s
+</code></pre></div></div>
+
+<p>If we check the operator pod log we see that we have the following lines:</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ kubectl -n rook-ceph logs rook-ceph-operator-6566dd4985-drrsw
+
+
+2019-07-31 11:41:54.722382 I | rookcmd: starting Rook v0.8.0-1294.g1b6fe840.dirty with arguments '/usr/local/bin/rook ceph operator'
+
+2019-07-31 11:41:54.722508 I | rookcmd: flag values: ....
+</code></pre></div></div>
+
+<p>Lets try to insert a new log line when the operator starts:</p>
+
+<p>We are going to do a very simple modification, just to add a new line in the Rook operator file when it starts. Modification will be done in the “rook/cmd/rook/rook/rook.go” file</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// LogStartupInfo log the version number, arguments, and all final flag values (environment variable overrides have already been taken into account)
+func LogStartupInfo(cmdFlags *pflag.FlagSet) {
+
+	flagValues := flags.GetFlagsAndValues(cmdFlags, "secret|keyring")
+	logger.Infof("starting Rook %s with arguments '%s'", version.Version, strings.Join(os.Args, " "))
+	logger.Infof("flag values: %s", strings.Join(flagValues, ", "))
+	logger.Infof("Hey!!!! -------------------- This is my very first line in Rook")
+}
+</code></pre></div></div>
+
+<p>Lets build the new operator container. This can be done in the root folder of the project:</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ pwd
+/home/jolmomar/go/src/github.com/rook/rook
+
+$ make -j4 IMAGES='ceph' build
+</code></pre></div></div>
+
+<p>Check that we have our new container:</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ docker images
+REPOSITORY                  TAG                 IMAGE ID            CREATED             SIZE
+build-4bc9ed8c/ceph-amd64   latest              ccd3c6105d1d        37 seconds ago      921MB
+</code></pre></div></div>
+
+<p>We must use this new image to start the operator pod. This means that k8 nodes should be able to pull the image from a registry.
+The easy option is to pull your modified image to one of your docker hub repos, and use it. So first thing to do is to create/use your docker hub account, and create a “rook” repo in docker hub.
+Once we have the “infrastructure” we can push our new image and start to use it in our k8 nodes.</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ docker tag build-4bc9ed8c/ceph-amd64 jolmomar/rook:latest
+
+$ docker push jolmomar/rook
+The push refers to repository [docker.io/jolmomar/rook]
+32011c0556a2: Pushed
+8d8bce899a8e: Pushed
+2f5e42981c8f: Pushed
+c1e065038222: Layer already exists
+d2774fc103ac: Layer already exists
+d69483a6face: Layer already exists
+latest: digest: sha256:b6053a2a5446944d9a0a3be50ec5b10f225ae2607ad013666bf08926ed77c563 size: 1579
+</code></pre></div></div>
+
+<p>To use this new image we must modify the operator.yaml file we use to manage the rook operator.</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ pwd
+/home/jolmomar/go/src/github.com/rook/rook/cluster/examples/kubernetes/ceph
+</code></pre></div></div>
+
+<p>Modify the file <em>operator.yaml</em>, to include the <em>path</em> to your Rook operator image:</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>...
+spec:
+  serviceAccountName: rook-ceph-system
+  containers:
+  - name: rook-ceph-operator
+    image: jolmomar/rook
+...
+</code></pre></div></div>
+
+<p>Once modified the “operator.yaml” file, lets go to try it. First thing to do is to delete the previous operator pod:</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ kubectl -n rook-ceph get pod
+NAME                                  READY     STATUS    RESTARTS   AGE
+rook-ceph-operator-6566dd4985-drrsw   1/1       Running   0          154m
+
+$ kubectl delete -f operator.yaml
+deployment.apps "rook-ceph-operator" deleted
+</code></pre></div></div>
+
+<p>Now let’s go to create again the operator pod, this time the image for it is the modified one, and it is available in our “rook” docker hub repo.</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ kubectl create -f operator.yaml
+deployment.apps/rook-ceph-operator created
+
+$ kubectl -n rook-ceph get pod
+NAME                                  READY     STATUS    RESTARTS   AGE
+rook-ceph-operator-6566dd4985-z4s9r   1/1       Running   0          21s
+</code></pre></div></div>
+
+<p>And the last step is just to check that our log line appears in the log file</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ kubectl -n rook-ceph logs rook-ceph-operator-6566dd4985-z4s9r
+2019-07-31 14:18:52.874209 I | rookcmd: starting Rook v0.8.0-1294.g1b6fe840.dirty with arguments '/usr/local/bin/rook ceph operator'
+2019-07-31 14:18:52.874385 I | rookcmd: flag values: ...
+...
+2019-07-31 14:18:52.874395 I | rookcmd: Hey!!!! -------------------- This is my very first line in Rook
+2019-07-31 14:18:52.874401 I | cephcmd: starting operator
+2019-07-31 14:18:52.907075 I | op-discover: rook-discover daemonset already exists, updating ...
+</code></pre></div></div>
+
+<p>And this is all… now you have the power to modify and improve the Rook operator.</p>
+
+<p>Is time to contribute your awesome ideas to the Rook project, the difficult part, to have the idea is done, so the only thing you need to do is to follow <a href="https://github.com/rook/rook/blob/master/CONTRIBUTING.md">the guide to contribute</a></p>
+
+  </div><a class="u-url" href="/rook/k8/ceph/2019/08/02/move_your_rook.html" hidden></a>
+</article>
+
+      </div>
+    </main><footer class="site-footer h-card">
+  <data class="u-url" href="/"></data>
+
+  <div class="wrapper">
+
+    <h2 class="footer-heading">Playing with the cloud</h2>
+
+    <div class="footer-col-wrapper">
+      <div class="footer-col footer-col-1">
+        <ul class="contact-list">
+          <li class="p-name">Playing with the cloud</li><li><a class="u-email" href="mailto:jolmomar@redhat.com">jolmomar@redhat.com</a></li></ul>
+      </div>
+
+      <div class="footer-col footer-col-2"><ul class="social-media-list"><li><a href="https://github.com/jmolmo"><svg class="svg-icon"><use xlink:href="/assets/minima-social-icons.svg#github"></use></svg> <span class="username">jmolmo</span></a></li></ul>
+</div>
+
+      <div class="footer-col footer-col-3">
+        <p>A blog to store those things that I learn about cloud development and maybe can be useful for somebody.</p>
+      </div>
+    </div>
+
+  </div>
+
+</footer>
+</body>
+
+</html>
