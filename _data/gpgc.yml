@@ -1,0 +1,11 @@
+repo_owner: jmolmo
+repo_name: jmolmo.github.io
+disabled: false
+use_show_action: false
+label_name: Post Comments
+label_color: 666666
+github_application:
+  client_id: Iv1.fdc70b6b603963ee
+  code_authenticator: https://play-cloud.herokuapp.com
+  callback_url: https://jmolmo.github.io/
+enable_diagnostics: false
